@@ -2,9 +2,10 @@ import cv2
 import numpy as np
 import logging
 import enlighten
+import argparse
 from time import time
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
@@ -12,10 +13,10 @@ class ColorMapMaker:
     def __init__(
         self,
         video_file_path: str,
-        image_size: int = 3000,
-        color_section_size: int = 1,
-        flip_to_vertical: bool = False,
-        sampling_interval: int = 24,
+        image_size: int,
+        color_section_size: int,
+        flip_to_vertical: bool,
+        sampling_interval: int,
     ):
         """
         :param video_file_path: Path to input video file of which color map will be created. Format support is determined by OpenCV support.
@@ -36,16 +37,6 @@ class ColorMapMaker:
             + f" -color_section_size = {color_section_size}\n"
             + f" -flip_to_vertical = {flip_to_vertical}\n"
             + f" -sampling_interval = {sampling_interval}"
-        )
-
-        self._total_video_frames = int(self._video.get(cv2.CAP_PROP_FRAME_COUNT))
-        number_of_color_sections = self._total_video_frames // sampling_interval
-        logger.debug(
-            f"Detected {self._total_video_frames} frames in loaded video, sampling {number_of_color_sections} colors"
-        )
-
-        self.result_image = np.zeros(
-            [self._image_size, self._color_section_size * number_of_color_sections, 3]
         )
 
     def process_image(self) -> None:
@@ -81,7 +72,6 @@ class ColorMapMaker:
                 break
             progress_bar.update()
         if self._flip_to_vertical:
-            #self.result_image = self.result_image.transpose()
             self.result_image = cv2.rotate(self.result_image, cv2.ROTATE_90_CLOCKWISE)
         end_time = time()
         logger.info(f"Processing time: {(end_time-start_time):.2f} seconds")
@@ -98,7 +88,72 @@ class ColorMapMaker:
 
 
 if __name__ == "__main__":
-    cmm = ColorMapMaker("videos/blade_runner_2049.avi", flip_to_vertical=True)
+    parser = argparse.ArgumentParser(description="Color Map Properties")
+    parser.add_argument(
+        "-i",
+        "--input-path",
+        required=True,
+        type=ascii,
+        help="Path to input video file of which color map will be created. Format support is determined by OpenCV support.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-path",
+        required=True,
+        type=ascii,
+        help="Path defining where output image will be saved.",
+    )
+    parser.add_argument(
+        "-s",
+        "--size",
+        required=False,
+        default=3000,
+        type=int,
+        help="Size (in pixels) of one of the images axis - height for default image, width for flipped (vertical). Other axis is defined by video length, sampling interval and color section size. Default is 3000",
+    )
+    parser.add_argument(
+        "-css",
+        "--color-section-size",
+        default=1,
+        type=int,
+        required=False,
+        help="Size in pixels (height or width depending if image is horizontal or vertical) of mean color segment in the result image. Default is 1.",
+    )
+    parser.add_argument(
+        "-f",
+        "--flip",
+        required=False,
+        default=False,
+        type=bool,
+        help="Decides whether image is presented vertically or horizontally. By default image is horizontal.",
+    )
+    parser.add_argument(
+        "-si",
+        "--sampling-interval",
+        default=24,
+        type=int,
+        required=False,
+        help="Number of frames between which mean color values is sampled. Default is 24, one sample per second for most movies.",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        required=False,
+        action="store_true",
+        help="Determines how much information is included in logs",
+    )
+    args = parser.parse_args()
+
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+
+    cmm = ColorMapMaker(
+        video_file_path=args.input_path,
+        image_size=args.size,
+        color_section_size=args.color_section_size,
+        flip_to_vertical=args.flip,
+        sampling_interval=args.sampling_interval,
+    )
     cmm.process_image()
-    cmm.save_result_to_file("results/br2049_vertical_result.jpg")
+    cmm.save_result_to_file(args.output_path)
     cmm.cleanup()
