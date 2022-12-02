@@ -3,7 +3,6 @@ import numpy as np
 import logging
 import enlighten
 import argparse
-from time import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -38,11 +37,24 @@ class ColorMapMaker:
             + f" -flip_to_vertical = {flip_to_vertical}\n"
             + f" -sampling_interval = {sampling_interval}"
         )
+        self._total_video_frames = int(self._video.get(cv2.CAP_PROP_FRAME_COUNT))
+        if self._total_video_frames == 0:
+            logger.error('Video was not loaded correctly, exiting.')
+            exit(1)
+        number_of_color_sections = self._total_video_frames // sampling_interval
+        logger.debug(
+            f"Detected {self._total_video_frames} frames in loaded video, sampling {number_of_color_sections} colors"
+        )
+
+        self.result_image = np.zeros(
+            [self._image_size, self._color_section_size * number_of_color_sections, 3]
+        )
 
     def process_image(self) -> None:
-        """ """
-        start_time = time()
-        logger.info("...")
+        """
+        Processes loaded file and creates color map in memory. 
+        """
+        logger.info("Started processing loaded image.")
         manager = enlighten.get_manager()
         progress_bar = manager.counter(
             total=self._total_video_frames, desc="Processed frames", unit="Frames"
@@ -73,16 +85,15 @@ class ColorMapMaker:
             progress_bar.update()
         if self._flip_to_vertical:
             self.result_image = cv2.rotate(self.result_image, cv2.ROTATE_90_CLOCKWISE)
-        end_time = time()
-        logger.info(f"Processing time: {(end_time-start_time):.2f} seconds")
-
+    
     def save_result_to_file(self, output_file_path: str) -> None:
-        """ """
-        cv2.imwrite(output_file_path, self.result_image)
-        logger.info("...")
+        retval = cv2.imwrite(output_file_path, self.result_image)
+        if retval:
+            logger.info(f'Succcesfully saved result image to {output_file_path}')
+        else:
+            logger.error('Saving result image failed.')
 
     def cleanup(self) -> None:
-        """ """
         self._video.release()
         cv2.destroyAllWindows()
 
@@ -93,14 +104,12 @@ if __name__ == "__main__":
         "-i",
         "--input-path",
         required=True,
-        type=ascii,
         help="Path to input video file of which color map will be created. Format support is determined by OpenCV support.",
     )
     parser.add_argument(
         "-o",
         "--output-path",
         required=True,
-        type=ascii,
         help="Path defining where output image will be saved.",
     )
     parser.add_argument(
@@ -124,7 +133,7 @@ if __name__ == "__main__":
         "--flip",
         required=False,
         default=False,
-        type=bool,
+        action='store_true',
         help="Decides whether image is presented vertically or horizontally. By default image is horizontal.",
     )
     parser.add_argument(
