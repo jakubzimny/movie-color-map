@@ -134,7 +134,7 @@ if __name__ == "__main__":
         required=False,
         default=False,
         action='store_true',
-        help="Decides whether image is presented vertically or horizontally. By default image is horizontal.",
+        help="Decides whether image is presented vertically or horizontally. By default image is horizontal, setting this makes it vertical.",
     )
     parser.add_argument(
         "-si",
